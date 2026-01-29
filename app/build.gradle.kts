@@ -162,6 +162,9 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
+    // Work
+    implementation(libs.androidx.work.runtime.ktx)
+
     // Monitoring
     implementation(libs.timber)
     debugImplementation(libs.leakcanary)
