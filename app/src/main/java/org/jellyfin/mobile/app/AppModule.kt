@@ -28,6 +28,8 @@ import org.jellyfin.mobile.MainViewModel
 import org.jellyfin.mobile.bridge.MediaSegments
 import org.jellyfin.mobile.bridge.NativePlayer
 import org.jellyfin.mobile.downloads.DownloadsViewModel
+import org.jellyfin.mobile.downloads.OfflineDownloadManager
+import org.jellyfin.mobile.downloads.OfflineDownloadManagerImpl
 import org.jellyfin.mobile.events.ActivityEventHandler
 import org.jellyfin.mobile.player.deviceprofile.DeviceProfileBuilder
 import org.jellyfin.mobile.player.interaction.PlayerEvent
@@ -90,6 +92,9 @@ val applicationModule = module {
     single { DeviceProfileBuilder(get()) }
     single { QualityOptionsProvider() }
     single { MediaSegmentRepository() }
+
+    // Download manager
+    single<OfflineDownloadManager> { OfflineDownloadManagerImpl(get(), get(), get(), get(), get()) }
 
     // ExoPlayer factories
     single<DatabaseProvider> {

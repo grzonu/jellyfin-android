@@ -15,19 +15,41 @@ import org.jellyfin.mobile.player.source.LocalJellyfinMediaSource
 import org.jellyfin.mobile.utils.extensions.toFileSize
 import kotlin.time.Duration
 
+enum class DownloadStatus {
+    PENDING,
+    DOWNLOADING,
+    COMPLETED,
+    FAILED,
+    CANCELLED
+}
+
 @Entity(
     tableName = TABLE_NAME,
     indices = [
         Index(value = [ITEM_ID], unique = true),
     ],
 )
-@TypeConverters(LocalJellyfinMediaSourceConverter::class)
+@TypeConverters(LocalJellyfinMediaSourceConverter::class, DownloadStatusConverter::class)
 data class DownloadEntity(
     @PrimaryKey
     @ColumnInfo(name = ITEM_ID)
     val itemId: String,
     @ColumnInfo(name = MEDIA_SOURCE)
     val mediaSource: LocalJellyfinMediaSource,
+    @ColumnInfo(name = QUALITY_BITRATE)
+    val qualityBitrate: Int? = null,
+    @ColumnInfo(name = QUALITY_MAX_HEIGHT)
+    val qualityMaxHeight: Int? = null,
+    @ColumnInfo(name = DOWNLOAD_TIMESTAMP)
+    val downloadTimestamp: Long? = null,
+    @ColumnInfo(name = EXPIRATION_TIMESTAMP)
+    val expirationTimestamp: Long? = null,
+    @ColumnInfo(name = DOWNLOAD_STATUS)
+    val downloadStatus: DownloadStatus = DownloadStatus.PENDING,
+    @ColumnInfo(name = DOWNLOAD_PROGRESS)
+    val downloadProgress: Float = 0f,
+    @ColumnInfo(name = FILE_SIZE_BYTES)
+    val fileSizeBytes: Long? = null,
 ) {
     /**
      * Converts the [mediaSource] string to a [LocalJellyfinMediaSource] object.
@@ -67,6 +89,13 @@ data class DownloadEntity(
         const val ID: String = "id"
         const val ITEM_ID: String = "item_id"
         const val MEDIA_SOURCE: String = "media_source"
+        const val QUALITY_BITRATE: String = "quality_bitrate"
+        const val QUALITY_MAX_HEIGHT: String = "quality_max_height"
+        const val DOWNLOAD_TIMESTAMP: String = "download_timestamp"
+        const val EXPIRATION_TIMESTAMP: String = "expiration_timestamp"
+        const val DOWNLOAD_STATUS: String = "download_status"
+        const val DOWNLOAD_PROGRESS: String = "download_progress"
+        const val FILE_SIZE_BYTES: String = "file_size_bytes"
     }
 }
 
@@ -76,4 +105,12 @@ class LocalJellyfinMediaSourceConverter {
 
     @TypeConverter
     fun fromLocalJellyfinMediaSource(value: LocalJellyfinMediaSource): String = Json.encodeToString(value)
+}
+
+class DownloadStatusConverter {
+    @TypeConverter
+    fun toDownloadStatus(value: String): DownloadStatus = DownloadStatus.valueOf(value)
+
+    @TypeConverter
+    fun fromDownloadStatus(value: DownloadStatus): String = value.name
 }
