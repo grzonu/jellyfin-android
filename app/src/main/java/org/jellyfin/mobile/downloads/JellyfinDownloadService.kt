@@ -2,6 +2,7 @@ package org.jellyfin.mobile.downloads
 
 import android.app.Notification
 import android.content.Context
+import android.graphics.BitmapFactory
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.util.NotificationUtil
 import androidx.media3.common.util.Util
@@ -14,6 +15,7 @@ import androidx.media3.exoplayer.scheduler.Scheduler
 import org.jellyfin.mobile.R
 import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.mobile.utils.extensions.toFileSize
+import java.io.File
 
 class JellyfinDownloadService : DownloadService(
     Constants.DOWNLOAD_NOTIFICATION_ID,
@@ -77,12 +79,25 @@ class JellyfinDownloadService : DownloadService(
             }
             val notification = when (download.state) {
                 Download.STATE_COMPLETED -> {
+                    val itemId = download.request.id.replace("-", "")
+                    val thumbnailFile = File(context.filesDir, "/Downloads/$itemId/${Constants.DOWNLOAD_THUMBNAIL_FILENAME}")
+                    val thumbnail = if (thumbnailFile.exists()) {
+                        BitmapFactory.decodeFile(thumbnailFile.canonicalPath)
+                    } else {
+                        null
+                    }
+
                     NotificationCompat.Builder(context, Constants.DOWNLOAD_NOTIFICATION_CHANNEL_ID)
                         .setSmallIcon(R.drawable.ic_notification)
                         .setContentTitle(
                             context.getString(R.string.downloaded, Util.fromUtf8Bytes(download.request.data)),
                         )
                         .setContentInfo(download.bytesDownloaded.toFileSize())
+                        .apply {
+                            if (thumbnail != null) {
+                                setLargeIcon(thumbnail)
+                            }
+                        }
                         .build()
                 }
                 Download.STATE_FAILED -> {

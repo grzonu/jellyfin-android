@@ -14,7 +14,9 @@ import kotlinx.coroutines.launch
 import org.jellyfin.mobile.MainActivity
 import org.jellyfin.mobile.R
 import org.jellyfin.mobile.bridge.JavascriptCallback
+import org.jellyfin.mobile.downloads.DownloadQualityOption
 import org.jellyfin.mobile.downloads.DownloadsFragment
+import org.jellyfin.mobile.downloads.OfflineDownloadManager
 import org.jellyfin.mobile.downloads.ui.DownloadQualityBottomSheet
 import org.jellyfin.mobile.player.ui.PlayerFragment
 import org.jellyfin.mobile.player.ui.PlayerFullscreenHelper
@@ -24,11 +26,16 @@ import org.jellyfin.mobile.utils.extensions.addFragment
 import org.jellyfin.mobile.utils.removeDownload
 import org.jellyfin.mobile.utils.requestDownload
 import org.jellyfin.mobile.webapp.WebappFunctionChannel
+import org.koin.core.component.KoinComponent
+import org.koin.core.component.inject
 import timber.log.Timber
+import java.util.UUID
 
 class ActivityEventHandler(
     private val webappFunctionChannel: WebappFunctionChannel,
-) {
+) : KoinComponent {
+    private val offlineDownloadManager: OfflineDownloadManager by inject()
+
     private val eventsFlow = MutableSharedFlow<ActivityEvent>(
         extraBufferCapacity = 10,
         onBufferOverflow = BufferOverflow.SUSPEND,
@@ -96,6 +103,25 @@ class ActivityEventHandler(
                     durationTicks = event.durationTicks,
                 )
                 val bottomSheet = DownloadQualityBottomSheet.newInstance(request)
+                bottomSheet.setCallback(object : DownloadQualityBottomSheet.Callback {
+                    override fun onDownloadConfirmed(
+                        itemId: UUID,
+                        quality: DownloadQualityOption,
+                        expirationDays: Int?,
+                    ) {
+                        lifecycleScope.launch {
+                            offlineDownloadManager.startDownload(
+                                itemId = org.jellyfin.sdk.model.UUID(itemId.mostSignificantBits, itemId.leastSignificantBits),
+                                qualityOption = quality,
+                                expirationDays = expirationDays,
+                            )
+                        }
+                    }
+
+                    override fun onDownloadCancelled() {
+                        Timber.d("Download cancelled by user")
+                    }
+                })
                 bottomSheet.show(supportFragmentManager, DownloadQualityBottomSheet.TAG)
             }
             is ActivityEvent.CastMessage -> {

@@ -11,7 +11,9 @@ import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.launch
 import org.jellyfin.mobile.R
 import org.jellyfin.mobile.data.entity.DownloadEntity
+import org.jellyfin.mobile.data.entity.DownloadStatus
 import org.jellyfin.mobile.databinding.FragmentDownloadsBinding
+import org.jellyfin.mobile.downloads.ui.DownloadItemOptionsDialog
 import org.jellyfin.mobile.events.ActivityEvent
 import org.jellyfin.mobile.events.ActivityEventHandler
 import org.jellyfin.mobile.player.interaction.PlayOptions
@@ -19,6 +21,7 @@ import org.jellyfin.mobile.utils.applyWindowInsetsAsMargins
 import org.jellyfin.mobile.utils.extensions.requireMainActivity
 import org.jellyfin.mobile.utils.withThemedContext
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.model.UUID
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -48,8 +51,15 @@ class DownloadsFragment : Fragment(), KoinComponent {
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewLifecycleOwner.repeatOnLifecycle(Lifecycle.State.STARTED) {
-                viewModel.downloads.collect { downloads ->
-                    adapter.submitList(downloads)
+                launch {
+                    viewModel.downloads.collect { downloads ->
+                        adapter.submitList(downloads)
+                    }
+                }
+                launch {
+                    viewModel.validationErrors.collect { errors ->
+                        adapter.setFileValidationErrors(errors)
+                    }
                 }
             }
         }
@@ -58,6 +68,16 @@ class DownloadsFragment : Fragment(), KoinComponent {
     }
 
     private fun onDownloadItemClick(download: DownloadEntity) {
+        val hasValidationError = viewModel.validationErrors.value.containsKey(download.itemId)
+        if (hasValidationError || download.downloadStatus == DownloadStatus.FAILED) {
+            activityEventHandler.emit(ActivityEvent.RemoveDownload(download.mediaSource))
+            return
+        }
+
+        if (download.downloadStatus != DownloadStatus.COMPLETED) {
+            return
+        }
+
         val playOptions = PlayOptions(
             ids = listOf(download.mediaSource.itemId),
             mediaSourceId = download.mediaSource.id,
@@ -71,6 +91,60 @@ class DownloadsFragment : Fragment(), KoinComponent {
     }
 
     private fun onDownloadItemHold(download: DownloadEntity) {
-        activityEventHandler.emit(ActivityEvent.RemoveDownload(download.mediaSource))
+        val hasValidationError = viewModel.validationErrors.value.containsKey(download.itemId)
+
+        DownloadItemOptionsDialog(
+            context = requireContext(),
+            download = download,
+            hasValidationError = hasValidationError,
+            callback = object : DownloadItemOptionsDialog.Callback {
+                override fun onPlayOffline(download: DownloadEntity) {
+                    playDownload(download)
+                }
+
+                override fun onDeleteDownload(download: DownloadEntity) {
+                    val itemId = UUID.fromString(download.itemId.replaceFirst(
+                        "(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})".toRegex(),
+                        "$1-$2-$3-$4-$5"
+                    ))
+                    viewModel.deleteDownload(itemId)
+                }
+
+                override fun onExtendExpiration(download: DownloadEntity) {
+                    DownloadItemOptionsDialog.showExtendExpirationDialog(requireContext()) { days ->
+                        val itemId = UUID.fromString(download.itemId.replaceFirst(
+                            "(\\w{8})(\\w{4})(\\w{4})(\\w{4})(\\w{12})".toRegex(),
+                            "$1-$2-$3-$4-$5"
+                        ))
+                        viewModel.extendExpiration(itemId, days)
+                    }
+                }
+
+                override fun onRedownload(download: DownloadEntity) {
+                    val item = download.mediaSource.item ?: return
+                    activityEventHandler.emit(
+                        ActivityEvent.ShowDownloadQualitySheet(
+                            itemId = download.mediaSource.itemId,
+                            itemName = item.name ?: "",
+                            itemType = item.type,
+                            durationTicks = item.runTimeTicks ?: 0L,
+                        )
+                    )
+                }
+            },
+        ).show()
+    }
+
+    private fun playDownload(download: DownloadEntity) {
+        val playOptions = PlayOptions(
+            ids = listOf(download.mediaSource.itemId),
+            mediaSourceId = download.mediaSource.id,
+            startIndex = 0,
+            startPosition = null,
+            audioStreamIndex = 1,
+            subtitleStreamIndex = -1,
+            playFromDownloads = true,
+        )
+        activityEventHandler.emit(ActivityEvent.LaunchNativePlayer(playOptions))
     }
 }

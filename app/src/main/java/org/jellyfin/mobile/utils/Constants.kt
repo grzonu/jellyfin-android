@@ -44,6 +44,7 @@ object Constants {
     const val PREF_DOWNLOAD_LOCATION = "pref_download_location"
     const val PREF_DOWNLOAD_INTERNAL = "pref_download_internal"
     const val PREF_MEDIA_SEGMENT_ACTIONS = "pref_media_segment_actions"
+    const val PREF_PREFER_OFFLINE_DOWNLOADS = "pref_prefer_offline_downloads"
 
     // InputManager commands
     const val PLAYBACK_MANAGER_COMMAND_PLAY = "unpause"
@@ -63,6 +64,7 @@ object Constants {
     }
     const val MEDIA_NOTIFICATION_CHANNEL_ID = "org.jellyfin.mobile.media.NOW_PLAYING"
     const val DOWNLOAD_NOTIFICATION_CHANNEL_ID = "org.jellyfin.mobile.download.DOWNLOAD_PROGRESS"
+    const val EXPIRATION_NOTIFICATION_CHANNEL_ID = "org.jellyfin.mobile.download.EXPIRATION_WARNING"
 
     // Music player constants
     const val SUPPORTED_MUSIC_PLAYER_PLAYBACK_ACTIONS: Long = PlaybackState.ACTION_PLAY_PAUSE or

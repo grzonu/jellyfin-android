@@ -161,6 +161,8 @@
     <string name="download_retry">Retry download</string>
     <string name="download_expiring_soon_title">Download expiring soon</string>
     <string name="download_expiring_soon_message">%1$s will be deleted tomorrow</string>
+    <string name="expiration_notification_channel">Download Expiration Warnings</string>
+    <string name="expiration_notification_channel_description">Notifications about downloads that will expire soon</string>
     <string name="download_in_progress">Downloading: %d%%</string>
     <string name="download_pending">Pending</string>
     <string name="download_failed">Download failed</string>
@@ -172,5 +174,16 @@
     <plurals name="download_series_selected">
         <item quantity="one">Download %d episode</item>
         <item quantity="other">Download %d episodes</item>
+    </plurals>
+
+    <!-- Download Item Options Dialog -->
+    <string name="download_options_title">Download Options</string>
+    <string name="download_option_play">Play offline</string>
+    <string name="download_option_delete">Delete download</string>
+    <string name="download_option_extend">Extend expiration</string>
+    <string name="download_option_redownload">Re-download</string>
+    <plurals name="download_extend_days">
+        <item quantity="one">Extend by %d day</item>
+        <item quantity="other">Extend by %d days</item>
     </plurals>
 </resources>

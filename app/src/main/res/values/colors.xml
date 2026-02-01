@@ -21,4 +21,9 @@
     <!-- Skip Media Segment Button -->
     <color name="skip_media_segment_background">#202124</color>
     <color name="skip_media_segment_text">#DDDDDD</color>
+
+    <!-- Download Status -->
+    <color name="download_status_warning">#FFA500</color>
+    <color name="download_status_error">#FF5252</color>
+    <color name="quality_badge_background">#555555</color>
 </resources>

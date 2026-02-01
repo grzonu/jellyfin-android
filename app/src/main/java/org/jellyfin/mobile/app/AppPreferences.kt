@@ -153,4 +153,7 @@ class AppPreferences(context: Context) {
     var externalPlayerApp: String
         get() = sharedPreferences.getString(Constants.PREF_EXTERNAL_PLAYER_APP, ExternalPlayerPackage.SYSTEM_DEFAULT)!!
         set(value) = sharedPreferences.edit { putString(Constants.PREF_EXTERNAL_PLAYER_APP, value) }
+
+    val preferOfflineDownloads: Boolean
+        get() = sharedPreferences.getBoolean(Constants.PREF_PREFER_OFFLINE_DOWNLOADS, true)
 }

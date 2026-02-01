@@ -6,6 +6,7 @@ import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.cache.Cache
 import androidx.media3.exoplayer.offline.DownloadManager
 import androidx.media3.exoplayer.offline.DownloadNotificationHelper
+import org.jellyfin.mobile.data.dao.DownloadDao
 import org.jellyfin.mobile.utils.Constants.DOWNLOAD_NOTIFICATION_CHANNEL_ID
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
@@ -18,6 +19,7 @@ object DownloadServiceUtil : KoinComponent {
     private val databaseProvider: DatabaseProvider by inject()
     private val downloadCache: Cache by inject()
     private val dataSourceFactory: DataSource.Factory by inject()
+    private val downloadDao: DownloadDao by inject()
     private var downloadManager: DownloadManager? = null
     private var downloadNotificationHelper: DownloadNotificationHelper? = null
     private var downloadTracker: DownloadTracker? = null
@@ -57,7 +59,7 @@ object DownloadServiceUtil : KoinComponent {
                     Executors.newFixedThreadPool(DOWNLOAD_THREADS),
                 )
             downloadTracker =
-                DownloadTracker(downloadManager!!)
+                DownloadTracker(downloadManager!!, downloadDao)
         }
     }
 }

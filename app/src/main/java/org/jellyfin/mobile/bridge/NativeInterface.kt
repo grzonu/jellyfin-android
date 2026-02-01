@@ -28,15 +28,20 @@ import org.jellyfin.sdk.api.client.util.AuthorizationHeaderBuilder
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
+import kotlinx.coroutines.runBlocking
+import org.jellyfin.mobile.data.dao.DownloadDao
+import org.jellyfin.sdk.model.api.BaseItemKind
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.get
 import org.koin.core.component.inject
 import timber.log.Timber
+import java.util.UUID
 
 @Suppress("unused")
 class NativeInterface(private val context: Context) : KoinComponent {
     private val activityEventHandler: ActivityEventHandler = get()
     private val remoteVolumeProvider: RemoteVolumeProvider by inject()
+    private val downloadDao: DownloadDao by inject()
 
     @SuppressLint("HardwareIds")
     @JavascriptInterface
@@ -172,6 +177,70 @@ class NativeInterface(private val context: Context) : KoinComponent {
     @JavascriptInterface
     fun execCast(action: String, args: String) {
         emitEvent(ActivityEvent.CastMessage(action, JSONArray(args)))
+    }
+
+    @JavascriptInterface
+    fun downloadOffline(args: String): Boolean {
+        return try {
+            val options = JSONObject(args)
+            val itemId = UUID.fromString(options.getString("itemId"))
+            val itemName = options.getString("itemName")
+            val itemTypeString = options.getString("itemType")
+            val durationTicks = options.getLong("durationTicks")
+
+            val itemType = try {
+                BaseItemKind.valueOf(itemTypeString.uppercase())
+            } catch (e: IllegalArgumentException) {
+                Timber.w("Unknown item type: %s, defaulting to VIDEO", itemTypeString)
+                BaseItemKind.VIDEO
+            }
+
+            emitEvent(ActivityEvent.ShowDownloadQualitySheet(itemId, itemName, itemType, durationTicks))
+            true
+        } catch (e: JSONException) {
+            Timber.e("downloadOffline failed: %s", e.message)
+            false
+        } catch (e: IllegalArgumentException) {
+            Timber.e("downloadOffline failed - invalid UUID: %s", e.message)
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun isDownloadedOffline(itemId: String): Boolean {
+        return try {
+            runBlocking { downloadDao.downloadExists(itemId) }
+        } catch (e: Exception) {
+            Timber.e("isDownloadedOffline failed: %s", e.message)
+            false
+        }
+    }
+
+    @JavascriptInterface
+    fun getDownloadStatus(itemId: String): String {
+        return try {
+            val download = runBlocking { downloadDao.get(itemId) }
+            if (download != null) {
+                JSONObject().apply {
+                    put("status", download.downloadStatus.name)
+                    put("progress", download.downloadProgress)
+                    put("expirationDate", download.expirationTimestamp)
+                }.toString()
+            } else {
+                JSONObject().apply {
+                    put("status", "NOT_FOUND")
+                    put("progress", 0)
+                    put("expirationDate", JSONObject.NULL)
+                }.toString()
+            }
+        } catch (e: Exception) {
+            Timber.e("getDownloadStatus failed: %s", e.message)
+            JSONObject().apply {
+                put("status", "ERROR")
+                put("progress", 0)
+                put("expirationDate", JSONObject.NULL)
+            }.toString()
+        }
     }
 
     @Suppress("NOTHING_TO_INLINE")

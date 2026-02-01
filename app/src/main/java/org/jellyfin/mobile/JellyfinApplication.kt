@@ -2,15 +2,20 @@ package org.jellyfin.mobile
 
 import android.app.Application
 import android.webkit.WebView
+import androidx.work.ExistingPeriodicWorkPolicy
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.WorkManager
 import org.jellyfin.mobile.app.apiModule
 import org.jellyfin.mobile.app.applicationModule
 import org.jellyfin.mobile.data.databaseModule
+import org.jellyfin.mobile.downloads.DownloadExpirationWorker
 import org.jellyfin.mobile.utils.JellyTree
 import org.jellyfin.mobile.utils.isWebViewSupported
 import org.koin.android.ext.koin.androidContext
 import org.koin.androidx.fragment.koin.fragmentFactory
 import org.koin.core.context.startKoin
 import timber.log.Timber
+import java.util.concurrent.TimeUnit
 
 @Suppress("unused")
 class JellyfinApplication : Application() {
@@ -37,5 +42,20 @@ class JellyfinApplication : Application() {
                 databaseModule,
             )
         }
+
+        scheduleDownloadExpirationWorker()
+    }
+
+    private fun scheduleDownloadExpirationWorker() {
+        val workRequest = PeriodicWorkRequestBuilder<DownloadExpirationWorker>(
+            repeatInterval = 1,
+            repeatIntervalTimeUnit = TimeUnit.DAYS,
+        ).build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            DownloadExpirationWorker.WORK_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            workRequest,
+        )
     }
 }

@@ -1,6 +1,7 @@
 package org.jellyfin.mobile.downloads
 
 import android.content.Context
+import android.os.StatFs
 import androidx.core.net.toUri
 import androidx.media3.exoplayer.offline.DownloadRequest
 import androidx.media3.exoplayer.offline.DownloadService
@@ -19,9 +20,17 @@ import org.jellyfin.mobile.player.source.MediaSourceResolver
 import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.mobile.utils.extractId
 import org.jellyfin.sdk.api.client.ApiClient
+import org.jellyfin.sdk.api.client.extensions.imageApi
 import org.jellyfin.sdk.model.UUID
+import org.jellyfin.sdk.model.api.ImageType
 import java.io.File
+import java.io.FileOutputStream
+import java.net.URL
 import java.util.concurrent.TimeUnit
+
+class InsufficientStorageException(val requiredBytes: Long, val availableBytes: Long) : Exception(
+    "Not enough storage space. Required: $requiredBytes bytes, Available: $availableBytes bytes",
+)
 
 data class DownloadProgress(
     val itemId: String,
@@ -71,6 +80,9 @@ class OfflineDownloadManagerImpl(
         expirationDays: Int?,
     ): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
+            val estimatedSize = qualityOption.estimatedFileSizeBytes
+            checkStorageSpace(estimatedSize)
+
             val deviceProfile = deviceProfileBuilder.getDeviceProfile()
             val jellyfinMediaSource = mediaSourceResolver.resolveMediaSource(
                 itemId = itemId,
@@ -123,6 +135,27 @@ class OfflineDownloadManagerImpl(
                 downloadRequest,
                 false,
             )
+
+            downloadThumbnail(itemId, downloadFolder)
+        }
+    }
+
+    private fun downloadThumbnail(itemId: UUID, downloadFolder: File) {
+        try {
+            val thumbnailUrl = apiClient.imageApi.getItemImageUrl(
+                itemId = itemId,
+                imageType = ImageType.PRIMARY,
+                fillWidth = THUMBNAIL_SIZE,
+                fillHeight = THUMBNAIL_SIZE,
+            )
+            val thumbnailFile = File(downloadFolder, Constants.DOWNLOAD_THUMBNAIL_FILENAME)
+            URL(thumbnailUrl).openStream().use { input ->
+                FileOutputStream(thumbnailFile).use { output ->
+                    input.copyTo(output)
+                }
+            }
+        } catch (@Suppress("TooGenericExceptionCaught") e: Exception) {
+            // Thumbnail download is best-effort, don't fail the download
         }
     }
 
@@ -216,6 +249,15 @@ class OfflineDownloadManagerImpl(
         }
     }.flowOn(Dispatchers.IO)
 
+    private fun checkStorageSpace(requiredBytes: Long) {
+        val statFs = StatFs(context.filesDir.path)
+        val availableBytes = statFs.availableBytes
+        val bufferBytes = STORAGE_BUFFER_BYTES
+        if (availableBytes < requiredBytes + bufferBytes) {
+            throw InsufficientStorageException(requiredBytes + bufferBytes, availableBytes)
+        }
+    }
+
     private fun buildTranscodingDownloadUrl(
         itemId: UUID,
         qualityOption: DownloadQualityOption,
@@ -239,5 +281,10 @@ class OfflineDownloadManagerImpl(
 
         val queryString = params.entries.joinToString("&") { (k, v) -> "$k=$v" }
         return "${apiClient.baseUrl}/Videos/$itemId/stream?$queryString"
+    }
+
+    companion object {
+        private const val STORAGE_BUFFER_BYTES = 100L * 1024 * 1024
+        private const val THUMBNAIL_SIZE = 300
     }
 }

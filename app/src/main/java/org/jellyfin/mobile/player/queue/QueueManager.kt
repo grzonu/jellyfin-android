@@ -11,7 +11,9 @@ import androidx.media3.exoplayer.source.MediaSource
 import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.source.SingleSampleMediaSource
+import org.jellyfin.mobile.app.AppPreferences
 import org.jellyfin.mobile.data.dao.DownloadDao
+import org.jellyfin.mobile.data.entity.DownloadStatus
 import org.jellyfin.mobile.player.PlayerException
 import org.jellyfin.mobile.player.PlayerViewModel
 import org.jellyfin.mobile.player.deviceprofile.DeviceProfileBuilder
@@ -45,6 +47,8 @@ class QueueManager(
     private val mediaSourceResolver: MediaSourceResolver by inject()
     private val deviceProfileBuilder: DeviceProfileBuilder by inject()
     private val deviceProfile = deviceProfileBuilder.getDeviceProfile()
+    private val appPreferences: AppPreferences by inject()
+    private val downloadDao: DownloadDao by inject()
 
     private var currentQueue: List<UUID> = emptyList()
     private var currentQueueIndex: Int = 0
@@ -166,6 +170,8 @@ class QueueManager(
 
     /**
      * Change the maximum bitrate to the specified value.
+     * When bitrate is 0 (Auto) and preferOfflineDownloads is enabled,
+     * checks for local download and uses it if available.
      */
     suspend fun changeBitrate(bitrate: Int?): Boolean {
         val currentMediaSource = getCurrentMediaSourceOrNull() as? RemoteJellyfinMediaSource ?: return false
@@ -175,6 +181,17 @@ class QueueManager(
 
         val currentPlayState = viewModel.getStateAndPause() ?: return false
 
+        if (bitrate == 0 && appPreferences.preferOfflineDownloads) {
+            val offlineResult = tryPlayOfflineDownload(
+                currentMediaSource.itemId,
+                currentPlayState.position,
+                currentMediaSource.selectedAudioStreamIndex,
+                currentMediaSource.selectedSubtitleStreamIndex,
+                currentPlayState.playWhenReady,
+            )
+            if (offlineResult) return true
+        }
+
         return startRemotePlayback(
             itemId = currentMediaSource.itemId,
             mediaSourceId = currentMediaSource.id,
@@ -183,6 +200,31 @@ class QueueManager(
             audioStreamIndex = currentMediaSource.selectedAudioStreamIndex,
             subtitleStreamIndex = currentMediaSource.selectedSubtitleStreamIndex,
             playWhenReady = currentPlayState.playWhenReady,
+        ) == null
+    }
+
+    private suspend fun tryPlayOfflineDownload(
+        itemId: UUID,
+        startTime: kotlin.time.Duration?,
+        audioStreamIndex: Int?,
+        subtitleStreamIndex: Int?,
+        playWhenReady: Boolean,
+    ): Boolean {
+        val itemIdString = itemId.toString().replace("-", "")
+        val download = downloadDao.get(itemIdString) ?: return false
+
+        if (download.downloadStatus != DownloadStatus.COMPLETED) return false
+
+        val localFileUri = download.mediaSource.remoteFileUri
+        val localFile = File(localFileUri)
+        if (!localFile.exists()) return false
+
+        return startDownloadPlayback(
+            mediaSourceId = itemIdString,
+            startTime = startTime,
+            audioStreamIndex = audioStreamIndex,
+            subtitleStreamIndex = subtitleStreamIndex,
+            playWhenReady = playWhenReady,
         ) == null
     }
 
